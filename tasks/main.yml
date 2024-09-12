@@ -1,29 +1,38 @@
 ---
-#
-# Last Update:
-# Wolfgang Hotwagner updated this file on 23. April 2024
-#
 
-# Disabling for Amazon Linux 2 as selinux is disabled by default.
-- name: Disable the selinux
-  ansible.posix.selinux:
-    state: disabled
-  when: (ansible_distribution != "Ubuntu") and (ansible_distribution != "Amazon")
+- name: Set vm.max_map_count in sysctl.conf
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: 262144
 
-- name: Tune the system settings
-  ansible.builtin.import_tasks: tune.yml
+- name: Set open files limit in sysctl.conf
+  ansible.posix.sysctl:
+    name: fs.file-max
+    value: 65536
 
 - name: Include opensearch installation
-  ansible.builtin.import_tasks: opensearch.yml
+  ansible.builtin.import_tasks: 
+    file: 01_install.yml
 
 - name: Include security plugin for opensearch
-  ansible.builtin.import_tasks: security.yml
+  ansible.builtin.import_tasks: 
+    file: 02_security.yml
 
-# After the cluster forms successfully for the first time,
-# remove the cluster.initial_master_nodes setting from each nodes' configuration.
-- name: Remove `cluster.initial_master_nodes` setting from configuration
-  ansible.builtin.command: sed -i '/cluster.initial_master_nodes/d' "{{ os_conf_dir }}/opensearch.yml"
+# After the cluster forms successfully for the first time, remove the
+# cluster.initial_master_nodes setting from each nodes' configuration.
 
-- name: Include tests
-  ansible.builtin.import_tasks: test.yml
-  when: os_test is truthy
+- name: Remove line containing 'cluster.initial_master_nodes' from opensearch.yml
+  ansible.builtin.lineinfile:
+    path: "{{ os_conf_dir }}/opensearch.yml"
+    regexp: '^cluster\.initial_master_nodes'
+    state: absent
+
+- name: Make sure opensearch is started
+  ansible.builtin.service:
+    name: opensearch
+    state: started
+    enabled: true
+
+- name: Include checks
+  ansible.builtin.import_tasks: 
+    file: 03_checks.yml

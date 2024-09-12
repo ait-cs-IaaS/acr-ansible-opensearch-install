@@ -14,4 +14,4 @@ discovery.seed_hosts: ["{{ os_nodes }}"]
 
 cluster.initial_master_nodes: ["{{ os_master_nodes }}"]
 
-node.roles: [{{ opensearch_hosts[opensearch_hostname]['roles'] }}]
+node.roles: [{{ opensearch_hosts[opensearch_hostname]['roles'] | default([]) }}]

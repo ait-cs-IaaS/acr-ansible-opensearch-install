@@ -1,11 +1,5 @@
 ---
 
-- name: OpenSearch Install | Download opensearch {{ os_version }}
-  ansible.builtin.get_url:
-    url: "{{ os_download_url }}/{{ os_version }}/opensearch-{{ os_version }}-linux-x64.tar.gz"
-    dest: "/tmp/opensearch.tar.gz"
-  register: download
-
 - name: OpenSearch Install | Create opensearch user
   ansible.builtin.user:
     name: "{{ os_user }}"
@@ -13,7 +7,6 @@
     shell: /bin/false
     create_home: true
     home: "{{ os_home }}"
-  when: download.changed or iac_enable
 
 - name: OpenSearch Install | Create home directory
   ansible.builtin.file:
@@ -21,15 +14,26 @@
     state: directory
     owner: "{{ os_user }}"
     group: "{{ os_user }}"
-  when: download.changed or iac_enable
+
+- ansible.builtin.debug:
+    msg: "Downloading Opensearch ... [be patient]"
+
+- name: OpenSearch Install | Download opensearch {{ os_version }}
+  ansible.builtin.get_url:
+    url: "{{ os_download_url }}/{{ os_version }}/opensearch-{{ os_version }}-linux-x64.tar.gz"
+    dest: "/tmp/opensearch.tar.gz"
 
 - name: OpenSearch Install | Extract the tar file
-  ansible.builtin.command: chdir=/tmp/ tar -xvzf opensearch.tar.gz -C "{{ os_home }}" --strip-components=1
-  when: download.changed or iac_enable
+  ansible.builtin.unarchive:
+    src: "/tmp/opensearch.tar.gz"
+    dest: "{{ os_home }}/"
+    extra_opts:
+      - --strip-components=1
+    remote_src: true
 
 - name: OpenSearch Install | Copy Configuration File
   ansible.builtin.blockinfile:
-    block: "{{ lookup('template', 'templates/opensearch-{{ cluster_type }}.yml') }}"
+    block: "{{ lookup('template', 'templates/opensearch-{{ cluster_type }}.yml.j2') }}"
     dest: "{{ os_conf_dir }}/opensearch.yml"
     backup: true
     state: present
@@ -41,7 +45,7 @@
 
 - name: OpenSearch Install | Copy jvm.options File for Instance
   ansible.builtin.template:
-    src: jvm.options
+    src: jvm.options.j2
     dest: "{{ os_conf_dir }}/jvm.options"
     owner: "{{ os_user }}"
     group: "{{ os_user }}"
@@ -50,5 +54,5 @@
 
 - name: OpenSearch Install | create systemd service
   ansible.builtin.template:
-    src: opensearch.service
+    src: opensearch.service.j2
     dest: "{{ systemctl_path }}/opensearch.service"

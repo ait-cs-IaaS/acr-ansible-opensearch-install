@@ -1,5 +1,5 @@
 galaxy_info:
-  author: Wolfgang Hotwagner(see MAINTAINERS.md)
+  author: Lenhard Reuter (see MAINTAINERS.md)
   description: Installs opensearch
   company: Austrian Institute of Technology
 
@@ -33,7 +33,7 @@ galaxy_info:
         - 12
     - name: Ubuntu
       versions:
-        - 22.04
+        - 24.04
   #
   # platforms:
   # - name: Fedora

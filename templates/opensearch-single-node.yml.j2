@@ -4,7 +4,7 @@ cluster.name: "{{ os_cluster_name }}"
 
 node.name: "{{ opensearch_hostname }}"
 
-network.host: "{{ opensearch_hosts[opensearch_hostname]['ip'] }}"
+network.host: "{{ os_host_ip }}"
 
 http.port: 9200
 

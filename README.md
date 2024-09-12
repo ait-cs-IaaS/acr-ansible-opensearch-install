@@ -20,9 +20,7 @@ and requires another role for that like  https://github.com/ait-testbed/atb-ansi
 # Configuration
 
 ```
-  # Start service after installation and run tests
-  os_test: True
-  os_version: "2.13.0"
+os_version: "2.13.0"
   os_dashboards_version: "2.13.0"
   os_dashboards_user: opensearch-dashboards
   os_download_url: https://artifacts.opensearch.org/releases/bundle/opensearch

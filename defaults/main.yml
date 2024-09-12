@@ -1,32 +1,23 @@
 ---
-#
-# Last Update:
-# Wolfgang Hotwagner updated this file on 23. April 2024
-#
 
-os_nodes: |-
-        {% for item in groups['os-cluster'] -%}
-          {{ item }}{% if not loop.last %}","{% endif %}
-        {%- endfor %}
+os_host_ip: 127.0.0.1
+opensearch_hostname: opensearch
+opensearch_hosts: ["{{ os_host_ip }}"]
 
-os_master_nodes: |-
-        {% for item in groups['master'] -%}
-          {{ item }}{% if not loop.last %}","{% endif %}
-        {%- endfor %}
-
-populate_inventory_to_hosts_file: true
+cluster_type: single-node
+os_nodes: []
+os_master_nodes: []
 
 xms_value: 2
 xmx_value: 2
 cert_valid_days: 730
+
 copy_custom_security_configs: false
 custom_security_plugin_configs:
   - files/tenants.yml
   - files/roles.yml
   - files/roles_mapping.yml
   - files/internal_users.yml
-iac_enable: false
-cluster_type: single-node
 
 os_home: /usr/share/opensearch
 os_conf_dir: /usr/share/opensearch/config
@@ -34,9 +25,21 @@ os_plugin_bin_path: /usr/share/opensearch/bin/opensearch-plugin
 os_sec_plugin_conf_path: /usr/share/opensearch/config/opensearch-security
 os_sec_plugin_tools_path: /usr/share/opensearch/plugins/opensearch-security/tools
 os_api_port: 9200
-os_test: True
 
 systemctl_path: /etc/systemd/system
 
-# Auth type: 'internal' or 'oidc' (OpenID). Default: internal
-auth_type: internal
+os_internal_users_template: internal_users.yml.j2
+
+os_download_url: https://artifacts.opensearch.org/releases/bundle/opensearch
+os_version: '2.13.0'
+
+# Password for kibanaserver user
+# used for opensearch dashboards 
+kibanaserver_password: P4$$w0rD_f0r_kibanaserver
+
+os_security_conf:
+  plugins.security.allow_default_init_securityindex: true
+  plugins.security.audit.type: internal_opensearch
+  plugins.security.enable_snapshot_restore_privilege: true
+  plugins.security.check_snapshot_restore_write_privileges: true
+  plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]

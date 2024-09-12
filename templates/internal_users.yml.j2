@@ -1,0 +1,46 @@
+---
+# This is the internal user database
+# The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
+
+_meta:
+  type: "internalusers"
+  config_version: 2
+
+
+# Service users
+{% for service_user in os_service_users %}
+
+{{ service_user.username }}:
+  hash: "{{ service_user.password | elasticsearch_password }}"
+  reserved: {{ service_user.reserved | default(true) | lower }}
+
+{% if service_user.backend_roles is defined %}
+  backend_roles: 
+{% for role in service_user.backend_roles %}
+  - "{{ role }}"
+{% endfor %}
+{% endif %}
+
+{% if service_user.description is defined %}
+  description: "{{ service_user.description }}"
+{% endif %}
+
+{% endfor %}
+
+# Internal users
+{% for user in os_users %}
+
+{{ user.username }}:
+  hash: "{{ user.password | elasticsearch_password }}"
+  reserved: {{ user.reserved | default(false) | lower }}
+  backend_roles: 
+{% for role in user.backend_roles | default(['admin']) %}
+  - "{{ role }}"
+{% endfor %}
+
+{% if user.description is defined %}
+  description: "{{ user.description }}"
+{% endif %}
+
+{% endfor %}
+

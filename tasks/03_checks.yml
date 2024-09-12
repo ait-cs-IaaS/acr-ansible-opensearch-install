@@ -1,16 +1,7 @@
----
-#
-# Last Update:
-# Wolfgang Hotwagner updated this file on 23. April 2024
-#
-- name: Make sure opensearch is started
-  ansible.builtin.service:
-    name: opensearch
-    state: started
-    enabled: true
 
 - name: Get all the installed ES plugins
-  ansible.builtin.command: "{{ os_plugin_bin_path }} list"
+  ansible.builtin.command: 
+    cmd: "{{ os_plugin_bin_path }} list"
   register: list_plugins
 
 - name: Show all the installed ES plugins
@@ -19,7 +10,7 @@
 
 - name: Wait for opensearch to startup
   ansible.builtin.wait_for:
-    host: "{{ opensearch_hosts[opensearch_hostname]['ip'] }}"
+    host: "{{ os_host_ip }}"
     port: "{{ os_api_port }}"
     delay: 5
     connect_timeout: 1

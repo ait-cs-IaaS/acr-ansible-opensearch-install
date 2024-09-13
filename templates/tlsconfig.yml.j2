@@ -5,7 +5,7 @@ ca:
       keysize: 2048
       validityDays: {{ cert_valid_days }}
       pkPassword: none
-      file: {{ os_certs_prefix }}_root-ca.pem
+      file: root-ca.pem
 
 ### Default values and global settings
 defaults:
@@ -27,7 +27,7 @@ defaults:
 #
 nodes:
 {% for item in opensearch_hosts %}
-  - name: {{ os_certs_prefix }}_{{ item }}
+  - name: {{ item }}
     dn: CN={{ item }},OU=Ops,O={{ domain_name }}\, Inc.,DC={{ domain_name }}
     dns: {{ item }}
     ip: {{ opensearch_hosts[item]['ip'] }}
@@ -43,6 +43,6 @@ nodes:
 # be specified with the attribute admin: true
 #
 clients:
-  - name: {{ os_certs_prefix }}_admin
+  - name: admin
     dn: CN=admin.{{ domain_name }},OU=Ops,O={{ domain_name }}\, Inc.,DC={{ domain_name }}
     admin: true

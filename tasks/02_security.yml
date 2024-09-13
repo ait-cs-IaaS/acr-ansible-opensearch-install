@@ -5,60 +5,81 @@
 
 ## Here we are going to use self-signed certificates for Transport (Node-Node communication) & REST API layer
 ## Using searchguard offline TLS tool to create node & root certificates
-- name: Security Plugin configuration | Force remove local temporary directory for certificates generation
+
+- name: Security Plugin configuration | Copy the security configuration file 1 to cluster
+  ansible.builtin.blockinfile:
+    block: "{{ os_security_conf | to_nice_yaml }}"
+    dest: "{{ os_conf_dir }}/opensearch.yml"
+    backup: true
+    insertafter: EOF
+    marker: "## {mark} OpenSearch Security common configuration ##"
+
+# --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
+
+- name: Check if the folder exists
   become: false
   local_action:
-    module: ansible.builtin.file
-    path: "{{ os_local_config_path }}"
-    state: absent
-  run_once: true
+    module: ansible.builtin.stat
+    path: "{{ os_local_certs_path }}"
+  register: folder_status
 
-- name: Security Plugin configuration | Create local temporary directory for certificates generation
-  become: false
-  local_action:
-    module: ansible.builtin.file
-    path: "{{ os_local_config_path }}"
-    state: directory
-  run_once: true
+- block:
+    - name: Security Plugin configuration | Create local temporary directory for certificates generation
+      become: false
+      local_action:
+        module: ansible.builtin.file
+        path: "{{ item }}"
+        state: directory
+        recurse: true
+      run_once: true
+      with_items:
+        - /tmp/opensearch_tmp
+        - "{{ os_local_certs_path }}"
 
-- name: Security Plugin configuration | Download certificates generation tool
-  become: false
-  local_action:
-    module: ansible.builtin.unarchive
-    src: https://search.maven.org/remotecontent?filepath=com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
-    dest: "{{ os_local_config_path }}/"
-    remote_src: true
-  run_once: true
+    - name: Security Plugin configuration | Download certificates generation tool
+      become: false
+      local_action:
+        module: ansible.builtin.unarchive
+        src: https://search.maven.org/remotecontent?filepath=com/floragunn/search-guard-tlstool/1.5/search-guard-tlstool-1.5.tar.gz
+        dest: "/tmp/opensearch_tmp/"
+        remote_src: true
+      run_once: true
 
-- name: Security Plugin configuration | Make the executable file
-  become: false
-  local_action:
-    module: ansible.builtin.file
-    dest: "{{ os_local_config_path }}/tools/sgtlstool.sh"
-    mode: a+x
-  run_once: true
+    - name: Security Plugin configuration | Make the executable file
+      become: false
+      local_action:
+        module: ansible.builtin.file
+        dest: "/tmp/opensearch_tmp/tools/sgtlstool.sh"
+        mode: a+x
+      run_once: true
 
-- name: Security Plugin configuration | Prepare the certificates generation template file
-  become: false
-  local_action:
-    module: ansible.builtin.template
-    src: tlsconfig.yml.j2
-    dest: "{{ os_local_config_path }}/config/tlsconfig.yml"
-  run_once: true
+    - name: Security Plugin configuration | Prepare the certificates generation template file
+      become: false
+      local_action:
+        module: ansible.builtin.template
+        src: tlsconfig.yml.j2
+        dest: "{{ os_local_certs_path }}/tlsconfig.yml"
+      run_once: true
 
-- name: Security Plugin configuration | Generate the node & admin certificates on localhost
-  become: false
-  local_action:
-    module: ansible.builtin.command 
-    cmd: "{{ os_local_config_path }}/tools/sgtlstool.sh -c {{ os_local_config_path }}/config/tlsconfig.yml -ca -crt -t {{ os_local_config_path }}/config/"
-  run_once: true
+    - name: Security Plugin configuration | Generate the node & admin certificates on localhost
+      become: false
+      local_action:
+        module: ansible.builtin.command 
+        cmd: "/tmp/opensearch_tmp/tools/sgtlstool.sh -c {{ os_local_certs_path }}/tlsconfig.yml -ca -crt -t {{ os_local_certs_path }}"
+      run_once: true
 
-# TODO: only generate if not present + create config dir per company !!! (tlsconfig)
+  when: not folder_status.stat.exists
 
-- name: Security Plugin configuration | Copy the node & admin certificates to opensearch nodes if at least one certificate is not found on at least one server
+# --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
+
+- name: Security Plugin configuration | Copy certificates to opensearch nodes
   ansible.builtin.copy:
-    src: "{{ os_local_config_path }}/config/{{ os_certs_prefix }}_{{ item }}"
-    dest: "{{ os_conf_dir }}/{{ os_certs_prefix }}_{{ item }}"
+    src: "{{ os_local_certs_path }}/{{ item }}"
+    dest: "{{ os_conf_dir }}/{{ item }}"
     mode: 0600
   with_items:
     - root-ca.pem
@@ -70,22 +91,14 @@
     - admin.key
     - admin.pem
 
-- name: Security Plugin configuration | Copy the security configuration file 1 to cluster
+- name: Security Plugin configuration | Copy the security configuration
   ansible.builtin.blockinfile:
-    block: "{{ os_security_conf | to_nice_yaml }}"
-    dest: "{{ os_conf_dir }}/opensearch.yml"
-    backup: true
-    insertafter: EOF
-    marker: "## {mark} OpenSearch Security common configuration ##"
-
-- name: Security Plugin configuration | Copy the security configuration file 2 to cluster
-  ansible.builtin.blockinfile:
-    block: "{{ lookup('file', '{{ os_local_config_path }}/config/{{ os_certs_prefix }}_{{ opensearch_hostname }}_elasticsearch_config_snippet.yml') }}"
+    block: "{{ lookup('file', os_local_certs_path + '/' + opensearch_hostname + '_elasticsearch_config_snippet.yml') }}"
     dest: "{{ os_conf_dir }}/opensearch.yml"
     backup: true
     insertafter: EOF
     marker: "## {mark} opensearch Security Node & Admin certificates configuration ##"
-
+    
 - name: Security Plugin configuration | Create security plugin configuration folder
   ansible.builtin.file:
     dest: "{{ os_sec_plugin_conf_path }}"
@@ -158,29 +171,12 @@
     mode: 0644
   run_once: true
 
-# - name: Security Plugin configuration | Set the Admin user password
-#   ansible.builtin.shell: >
-#     sed -i '/hash: / s,{{ item.password }},'$(bash {{ os_sec_plugin_tools_path }}/hash.sh -p {{ item.password }} | tail -1)','
-#     {{ os_sec_plugin_conf_path }}/internal_users.yml
-#   environment:
-#     JAVA_HOME: "{{ os_home }}/jdk/"
-#   run_once: true
-#   with_items: "{{ os_service_users + os_users | default([]) }}"
-
-# # - name: Security Plugin configuration | Set the kibanaserver user pasword
-# #   ansible.builtin.shell: >
-# #     sed -i '/hash: / s,{{ kibanaserver_password }},'$(bash {{ os_sec_plugin_tools_path }}/hash.sh -p {{ kibanaserver_password }} | tail -1)','
-# #     {{ os_sec_plugin_conf_path }}/internal_users.yml
-# #   environment:
-# #     JAVA_HOME: "{{ os_home }}/jdk/"
-# #   run_once: true
-
 - name: Security Plugin configuration | Initialize the opensearch security index in opensearch with CUSTOM configs
   ansible.builtin.shell: >
     bash {{ os_sec_plugin_tools_path }}/securityadmin.sh
-    -cacert {{ os_conf_dir }}/{{ os_certs_prefix }}_root-ca.pem
-    -cert {{ os_conf_dir }}/{{ os_certs_prefix }}_admin.pem
-    -key {{ os_conf_dir }}/{{ os_certs_prefix }}_admin.key
+    -cacert {{ os_conf_dir }}/root-ca.pem
+    -cert {{ os_conf_dir }}/admin.pem
+    -key {{ os_conf_dir }}/admin.key
     -cd {{ os_sec_plugin_conf_path }}
     -nhnv -icl
     -h {{ os_host_ip }}
@@ -194,9 +190,9 @@
 - name: Security Plugin configuration | Initialize the opensearch security index in opensearch with DEFAULT configs
   ansible.builtin.shell: >
     bash {{ os_sec_plugin_tools_path }}/securityadmin.sh
-    -cacert {{ os_conf_dir }}/{{ os_certs_prefix }}_root-ca.pem
-    -cert {{ os_conf_dir }}/{{ os_certs_prefix }}_admin.pem
-    -key {{ os_conf_dir }}/{{ os_certs_prefix }}_admin.key
+    -cacert {{ os_conf_dir }}/root-ca.pem
+    -cert {{ os_conf_dir }}/admin.pem
+    -key {{ os_conf_dir }}/admin.key
     -f {{ os_sec_plugin_conf_path }}/internal_users.yml
     -nhnv -icl
     -h {{ os_host_ip }}

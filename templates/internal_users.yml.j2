@@ -11,7 +11,7 @@ _meta:
 {% for service_user in os_service_users %}
 
 {{ service_user.username }}:
-  hash: "{{ service_user.password | elasticsearch_password }}"
+  hash: "{{ service_user.password | opensearch_bcrypt }}"
   reserved: {{ service_user.reserved | default(true) | lower }}
 
 {% if service_user.backend_roles is defined %}
@@ -31,7 +31,7 @@ _meta:
 {% for user in os_users %}
 
 {{ user.username }}:
-  hash: "{{ user.password | elasticsearch_password }}"
+  hash: "{{ user.password | opensearch_bcrypt }}"
   reserved: {{ user.reserved | default(false) | lower }}
   backend_roles: 
 {% for role in user.backend_roles | default(['admin']) %}
